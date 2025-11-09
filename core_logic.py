@@ -140,6 +140,10 @@ def _pulizia_peso_globale(series_pesi):
 
 
 def estrai_dati_bolla_reale(file_caricato):
+    """
+    Estrae i dati delle Voci Doganali da un PDF.
+    Restituisce solo il DataFrame delle voci.
+    """
     voci_list = []
     testo_completo = ""
     try:
@@ -155,10 +159,8 @@ def estrai_dati_bolla_reale(file_caricato):
         blocchi_articolo = pattern_splitter.split(testo_completo)
 
         if len(blocchi_articolo) < 2:
-            print("Nessun blocco articolo trovato (re.split() non ha diviso nulla).")
-            return pd.DataFrame(), pd.DataFrame() 
-
-        print(f"Estrazione completata. Trovati {len(blocchi_articolo) - 1} voci doganali.")
+            # Nessun blocco articolo trovato
+            return pd.DataFrame() 
 
         for i, blocco_testo in enumerate(blocchi_articolo[1:]):
             match_colli = pattern_colli.search(blocco_testo)
@@ -171,23 +173,16 @@ def estrai_dati_bolla_reale(file_caricato):
         
         voci_estratte_df = pd.DataFrame(voci_list)
         
-        # --- CODICE DI PULIZIA PESO DEFINITIVO (USANDO LA FUNZIONE HELPER) ---
+        # Pulizia Tipi di Dati
         voci_estratte_df['Colli Totali'] = pd.to_numeric(
             voci_estratte_df['Colli Totali'].astype(str).str.replace("'", "", regex=False), 
             errors='coerce'
         ).fillna(0).astype(int)
         
         voci_estratte_df['Peso Totale'] = _pulizia_peso_globale(voci_estratte_df['Peso Totale']).fillna(0.0)
-        # --- FINE CORREZIONE ---
-
-        # Dati Partite A3: (Usa i dati di default, l'utente li sovrascriverà)
-        partite_estratte_df = pd.DataFrame([
-            {"Partita A3": "AAAA1234567", "Colli Totali": 0, "Peso Totale": 0.00},
-            {"Partita A3": "BBBB1234567", "Colli Totali": 0, "Peso Totale": 0.00},
-        ])
         
-        return voci_estratte_df, partite_estratte_df
+        return voci_estratte_df
         
-    except Exception as e:
-        print(f"Errore durante l'estrazione PDF con Regex: {e}")
-        return pd.DataFrame(), pd.DataFrame()
+    except Exception:
+        # Errore durante l'estrazione
+        return pd.DataFrame()

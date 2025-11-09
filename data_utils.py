@@ -18,74 +18,6 @@ def _normalize(s: str) -> str:
     s = re.sub(r'[^a-z0-9 ]+', ' ', s)
     return re.sub(r'\s+', ' ', s)
 
-def extract_m2_classic_data(df_in: pd.DataFrame) -> pd.DataFrame:
-    """
-    Questa funzione è un fallback per 'select_three_columns'.
-    Viene mantenuta ma modificata per restituire i NUOVI nomi di colonna.
-    """
-    CONTAINER_REGEX = r'^[A-Z]{4}\d{7}$' 
-    
-    if df_in is None or df_in.empty:
-        raise ValueError("Il DataFrame partite è vuoto.")
-
-    # Normalizza nomi colonna
-    norm = {c: re.sub(r'\s+', ' ', str(c)).strip().lower() for c in df_in.columns}
-    name_col = None
-    colli_col = None
-    peso_col = None
-
-    # Mappa per nome colonna (cerca le colonne originali: Sigla Container / Colli / Peso Totale)
-    for c, n in norm.items():
-        if name_col is None and ("sigla" in n and "container" in n):
-             name_col = c
-        if colli_col is None and ("colli" in n):
-             colli_col = c
-        if peso_col is None and ("peso" in n):
-             peso_col = c
-    
-    # Tentativo di fallback se la sigla non è esplicita
-    if name_col is None:
-        for c in df_in.columns:
-             sample = df_in[c].dropna().astype(str).str.strip().str.upper().head(25)
-             if sample.str.fullmatch(CONTAINER_REGEX).any():
-                  name_col = c
-                  break
-
-    if name_col is None or colli_col is None or peso_col is None:
-        raise KeyError(
-            f"Impossibile individuare colonne 'Sigla Container'/'Colli'/'Peso'. "
-            f"Colonne disponibili: {list(df_in.columns)}"
-        )
-
-    # --- BLOCCO MODIFICATO ---
-    # Crea il DataFrame con i NUOVI nomi di colonna
-    df = df_in[[name_col, colli_col, peso_col]].copy()
-    df.columns = ['Partita A3/MRN', 'Colli', 'Peso lordo'] # NOMI UNIFICATI
-    # --- FINE BLOCCO MODIFICATO ---
-
-    # Pulizia valori
-    df['Partita A3/MRN'] = df['Partita A3/MRN'].astype(str).str.strip().str.upper()
-    df['Colli'] = pd.to_numeric(df['Colli'], errors='coerce')
-    df['Peso lordo'] = pd.to_numeric(df['Peso lordo'], errors='coerce')
-
-    # Filtra solo righe con sigla container valida (AAAA9999999)
-    df = df[df['Partita A3/MRN'].str.fullmatch(CONTAINER_REGEX, na=False)]
-
-    # Scarta righe non numeriche o non positive
-    df = df[(df['Colli'] > 0) & (df['Peso lordo'] > 0)]
-    df = df.dropna(subset=['Colli', 'Peso lordo'])
-
-    # Rimuovi duplicati palesi
-    df = df.drop_duplicates(subset=['Partita A3/MRN', 'Colli', 'Peso lordo']).reset_index(drop=True)
-
-    if df.empty:
-        raise ValueError("Nessuna riga valida dopo la pulizia. Verifica Sigla/Colli/Peso nel file.")
-    
-    # Aggiungi colonne Contenitore e MRN-S (nullo) per standardizzare
-    df['Contenitore'] = df['Partita A3/MRN']
-    df['MRN-S'] = None
-    return df
-
 def read_excel_or_csv(uploaded_file, just_read=False):
     """
     Legge un file Excel o CSV (M2 o A3) in modo tollerante e multi-formato.
@@ -135,7 +67,6 @@ def read_excel_or_csv(uploaded_file, just_read=False):
         if all(k in row_text for k in ["colli", "peso"]) or "mrn" in row_text:
             header_row = i
             break
-    # NOTA: Rimuovendo 'header_row = 0' si risolve il bug dei file senza intestazione
     
     # --- Ricarica il file con header corretto ---
     uploaded_file.seek(0)
@@ -160,9 +91,7 @@ def read_excel_or_csv(uploaded_file, just_read=False):
     df = df.loc[:, ~df.columns.duplicated()]
     return df
 
-# ======================================================================
-# --- INIZIO BLOCCO RICONOSCIMENTO AUTOMATICO ---
-# ======================================================================
+# --- BLOCCO RICONOSCIMENTO AUTOMATICO ---
 def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
     """
     Riconosce automaticamente le colonne basandosi sul *contenuto*
@@ -211,14 +140,12 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
     available_cols = list(df.columns)
     df_copy = df.copy() 
 
-    # --- FASE 1: Riconoscimento basato sul CONTENUTO ---
+    # --- FASE 1: Riconoscimento CONTENUTO (Solo per chiavi complesse: MRN, Container) ---
     
     # 1a. Trova e splitta la colonna combinata MRN/MRN-S
     found_split_mrn = False
     for c in available_cols:
         if check_col_content(df_copy[c], MRN_SPLIT_REGEX):
-            # --- RIGA RIMOSSA --- (Problema 4)
-            # st.success(f"Rilevato formato MRN-S combinato nella colonna '{c}'.") 
             extracted = df_copy[c].astype(str).str.extract(MRN_SPLIT_REGEX, expand=True)
             
             col_mrn = f"__mrn_split_{c}"
@@ -227,7 +154,7 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
             df_copy[col_mrn] = extracted[0]
             df_copy[col_mrns] = extracted[1]
             
-            mapped[col_mrn] = "Partita A3/MRN" # NOME UNIFICATO
+            mapped[col_mrn] = "Partita A3/MRN"
             mapped[col_mrns] = "MRN-S"
             
             available_cols.remove(c)
@@ -238,7 +165,7 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
     if not found_split_mrn: 
         for c in available_cols:
             if check_col_content(df_copy[c], MRN_REGEX):
-                mapped[c] = "Partita A3/MRN" # NOME UNIFICATO
+                mapped[c] = "Partita A3/MRN"
                 available_cols.remove(c)
                 break 
             
@@ -247,51 +174,25 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
             if "Partita A3/MRN" in mapped.values():
                 mapped[c] = "Contenitore" 
             else:
-                mapped[c] = "Partita A3/MRN" # NOME UNIFICATO
+                mapped[c] = "Partita A3/MRN"
             available_cols.remove(c)
             break 
 
-    # 1c. Trova Pesi (Float/Decimali)
-    for c in available_cols:
-        if is_decimal_col(df_copy[c]):
-            mapped[c] = "Peso lordo" # NOME UNIFICATO
-            available_cols.remove(c)
-            break 
-
-    # 1d. Trova Colli e MRN-S (Entrambi Interi)
-    int_cols = []
-    for c in available_cols:
-        if is_integer_col(df_copy[c]):
-            int_cols.append(c)
-
-    if len(int_cols) == 1:
-        mapped[int_cols[0]] = "Colli" # NOME UNIFICATO
-        available_cols.remove(int_cols[0])
-    elif len(int_cols) > 1:
-        if 'MRN-S' not in mapped.values():
-            means = {c: pd.to_numeric(df_copy[c], errors='coerce').mean() for c in int_cols}
-            colli_col = max(means, key=means.get)
-            mrns_col = min(means, key=means.get)
-            
-            mapped[colli_col] = "Colli" # NOME UNIFICATO
-            mapped[mrns_col] = "MRN-S"
-            available_cols.remove(colli_col)
-            available_cols.remove(mrns_col)
-        else: 
-            mapped[int_cols[0]] = "Colli" # NOME UNIFICATO
-            available_cols.remove(int_cols[0])
-
-
-    # --- FASE 2: Fallback su Intestazioni (per colonne non trovate) ---
+    # --- FASE 2: Riconoscimento HEADER (Per valori semplici: Colli, Peso, MRN-S) ---
+    # Questo ora viene eseguito PRIMA del fallback basato sul contenuto (is_decimal/is_integer)
+    # per evitare di mappare erroneamente colonne come 'ID'
+    
     cols_norm = {c: _normalize(c) for c in available_cols} 
         
     for c, n in cols_norm.items():
+        # Cerca Partita A3/MRN solo se non già trovato da CONTENUTO
         if "Partita A3/MRN" not in mapped.values():
             if ("sigla" in n and "container" in n) or ("mrn" in n and "s" not in n):
-                mapped[c] = "Partita A3/MRN" # NOME UNIFICATO
+                mapped[c] = "Partita A3/MRN"
                 if c in available_cols: available_cols.remove(c)
                 continue
 
+        # Cerca Contenitore solo se non già trovato da CONTENUTO
         if "Contenitore" not in mapped.values():
              if ("container" in n or "cont" in n) and "sigla" not in n and "tipo" not in n:
                 mapped[c] = "Contenitore"
@@ -300,13 +201,13 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
         
         if "Colli" not in mapped.values():
             if "colli" in n:
-                mapped[c] = "Colli" # NOME UNIFICATO
+                mapped[c] = "Colli"
                 if c in available_cols: available_cols.remove(c)
                 continue
 
         if "Peso lordo" not in mapped.values():
             if "peso" in n and "netto" not in n:
-                mapped[c] = "Peso lordo" # NOME UNIFICATO
+                mapped[c] = "Peso lordo"
                 if c in available_cols: available_cols.remove(c)
                 continue
         
@@ -316,6 +217,44 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
                 if c in available_cols: available_cols.remove(c)
                 continue
 
+    # --- FASE 3: Fallback su CONTENUTO (Per Colli e Peso se non trovati) ---
+
+    # 3a. Trova Pesi (Float/Decimali) - SOLO SE non trovato da Header
+    if "Peso lordo" not in mapped.values():
+        for c in available_cols:
+            if is_decimal_col(df_copy[c]):
+                mapped[c] = "Peso lordo"
+                available_cols.remove(c)
+                break 
+
+    # 3b. Trova Colli e MRN-S (Entrambi Interi) - SOLO SE non trovati da Header
+    if "Colli" not in mapped.values() or "MRN-S" not in mapped.values():
+        int_cols = []
+        for c in available_cols:
+            if is_integer_col(df_copy[c]):
+                int_cols.append(c)
+
+        if len(int_cols) == 1:
+            if "Colli" not in mapped.values():
+                mapped[int_cols[0]] = "Colli"
+                available_cols.remove(int_cols[0])
+        elif len(int_cols) > 1:
+            # Questa è la logica che causava l'errore, ora è usata solo come fallback
+            if 'MRN-S' not in mapped.values() and "Colli" not in mapped.values():
+                means = {c: pd.to_numeric(df_copy[c], errors='coerce').mean() for c in int_cols}
+                colli_col = max(means, key=means.get)
+                mrns_col = min(means, key=means.get)
+                
+                mapped[colli_col] = "Colli"
+                mapped[mrns_col] = "MRN-S"
+                available_cols.remove(colli_col)
+                available_cols.remove(mrns_col)
+            elif "Colli" not in mapped.values():
+                # Se MRN-S è stato trovato da HEADER, ma Colli no
+                mapped[int_cols[0]] = "Colli"
+                available_cols.remove(int_cols[0])
+
+
     # --- Pulizia Finale ---
     df_sel = df_copy[[c for c in df_copy.columns if c in mapped]].rename(columns=mapped)
     
@@ -323,8 +262,10 @@ def select_three_columns(df: pd.DataFrame) -> pd.DataFrame:
         if check_col_content(df_sel['Partita A3/MRN'], CONT_REGEX):
              df_sel['Contenitore'] = df_sel['Partita A3/MRN']
 
+    # Assicura che MRN-S sia sempre testo (stringa), anche se letto come numero
+    # (Questa è la correzione della patch precedente, che manteniamo per sicurezza)
+    if "MRN-S" in df_sel.columns:
+        df_sel["MRN-S"] = df_sel["MRN-S"].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
+
     df_sel = df_sel.loc[:, ~df_sel.columns.duplicated()]
     return df_sel
-# ======================================================================
-# --- FINE BLOCCO RICONOSCIMENTO AUTOMATICO ---
-# ======================================================================

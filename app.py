@@ -23,14 +23,12 @@ from styles import (
 # Importa le funzioni di DATA da data_utils.py
 from data_utils import (
     _normalize,
-    extract_m2_classic_data,
+    # extract_m2_classic_data è stata rimossa perché obsoleta
     read_excel_or_csv,
     select_three_columns
 )
 
-# ======================================================================
 # FUNZIONE DI ORCHESTRAZIONE (CONTROLLER) - LOGICA UNIFICATA
-# ======================================================================
 def run_processing(): 
     """
     Esegue l'intero processo con logica di solving UNIFICATA (SolverA3)
@@ -55,7 +53,7 @@ def run_processing():
         voci_df_solver["peso"] = pd.to_numeric(voci_df_solver["peso"], errors="coerce").fillna(0)
         
     except Exception as e:
-        return f"Errore durante la preparazione delle Voci H1: {e}", None, None, None
+        return f"Errore during la preparazione delle Voci H1: {e}", None, None, None
 
 
     # 2. Prepara PARTITE A3 dall'editor
@@ -135,7 +133,7 @@ def run_processing():
         solver = SolverA3(voci_df_solver, partite_df_solver) 
         griglia_colli, griglia_peso = solver.risolvi()
 
-        # Popola lo stato di sessione M2 Classica
+        # Popola lo stato di sessione con i risultati
         voci_att = pd.DataFrame({
             "Colli Allocati": griglia_colli.sum(axis=1),
             "Peso Allocato": griglia_peso.sum(axis=1),
@@ -167,7 +165,7 @@ def run_processing():
         return f"Errore critico during il calcolo SolverA3: {e}", None, None, None
 
 
-# ===== CONFIGURAZIONE BASE ===================================================
+# --- CONFIGURAZIONE BASE ---
 st.set_page_config(
     layout="wide",
     page_title="Easy M2 Solver",
@@ -178,11 +176,12 @@ st.set_page_config(
 # Applica gli stili (importato da styles.py)
 apply_custom_css()
 
-# ===== LOGO IN ALTO A SINISTRA ==============================================
+# --- LOGO IN ALTO A SINISTRA ---
 BASE_DIR = os.path.dirname(__file__)
-LOGO_FILENAME = "LOGO_EASYM2_HOR_1.png"
+# CORREZIONE: Il file fornito è .jpg, non .png
+LOGO_FILENAME = "LOGO_EASYM2_HOR_1.jpg" 
 LOGO_PATH = os.path.join(BASE_DIR, LOGO_FILENAME)
-mime_type = "image/png"
+mime_type = "image/jpeg" # CORREZIONE: Mime type per jpg
 
 img_tag = '<span style="font-size:2rem;">📦</span>'
 try:
@@ -201,7 +200,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ===== LOAD TEMPLATE FILE ==============================================
+# --- LOAD TEMPLATE FILE ---
 TEMPLATE_FILENAME = "EASYM2_A3_TEMPLATE.xlsx"
 TEMPLATE_PATH = os.path.join(BASE_DIR, TEMPLATE_FILENAME)
 try:
@@ -210,7 +209,7 @@ try:
 except FileNotFoundError:
     TEMPLATE_BYTES = None 
 
-# ===== SESSION STATE =========================================================
+# --- SESSION STATE ---
 # Standardizza i dati di default per matchare le colonne caricate
 default_voci = pd.DataFrame(
     [{"Voce Doganale": "TARIC (Esempio)", "Colli": 100, "Peso lordo": 1000.0}]
@@ -242,7 +241,7 @@ def run_js_tab_switch(tab_index):
     st.components.v1.html(js_code, height=0)
 
 
-# ===== LAYOUT PRINCIPALE =====================================================
+# --- LAYOUT PRINCIPALE ---
 col_left, col_right = st.columns([1.2, 1.8], gap="medium")
 
 # --- COLONNA SINISTRA (INPUT) --------------------------------------------------------
@@ -259,7 +258,8 @@ with col_left:
             if pdf:
                 with st.spinner("Estrazione dal PDF..."):
                     
-                    voci_df, _ = estrai_dati_bolla_reale(pdf) 
+                    # MODIFICA: la funzione ora ritorna solo 1 df
+                    voci_df = estrai_dati_bolla_reale(pdf) 
                     
                     if not voci_df.empty:
                         
@@ -291,7 +291,6 @@ with col_left:
                 st.session_state.voci_data_source,
                 key="editor_voci", 
                 num_rows="dynamic",
-                # width="stretch", # Assicurati che questo sia rimosso o commentato
                 height=240,
                 column_config={
                     "Voce Doganale": st.column_config.TextColumn(width=200), # Larghezza fissa in px
@@ -324,7 +323,7 @@ with col_left:
             if excel_a3_file:
                 df_in = read_excel_or_csv(excel_a3_file, just_read=False) 
                 if not df_in.empty:
-                    df3 = select_three_columns(df_in) # Ora usa il RICONOSCIMENTO AUTOMATICO
+                    df3 = select_three_columns(df_in) # Usa il RICONOSCIMENTO AUTOMATICO
                     if not df3.empty:
                          st.session_state.partite_data_source = df3.copy()
                          
@@ -352,15 +351,12 @@ with col_left:
                 st.session_state.partite_data_source,
                 key="editor_partite",
                 num_rows="dynamic",
-                # width="stretch", # Assicurati che questo sia rimosso o commentato
                 height=240,
                 column_config=partite_config 
             )
             st.session_state.partite_final_data = partite_data_edited
 
-    # ======================================================================
     # --- AREA DI VERIFICA E CALCOLO (PRE-FLIGHT CHECK) ---
-    # ======================================================================
     st.markdown("---") # Separatore visivo
     st.caption("VERIFICA TOTALI (H1 vs A3)")
     
@@ -411,7 +407,6 @@ with col_left:
 
     
     # --- Interfaccia di verifica con 3 colonne ---
-    
     check_col1, check_col2, check_col3 = st.columns([0.8, 1, 1])
 
     with check_col1:
@@ -444,11 +439,6 @@ with col_left:
         else:
             st.warning("⚠️ I totali non coincidono. Correggi i dati negli editor per abilitare il calcolo.")
     
-    # ======================================================================
-    # --- FINE BLOCCO CALCOLO ---
-    # ======================================================================
-
-
 # --- COLONNA DESTRA (RISULTATI) ---------------------------------------------
 with col_right:
     st.subheader("🚀 Risultati in tempo reale")
@@ -470,9 +460,6 @@ with col_right:
             
             else:
                 pass
-
-
-    # --- FINE LOGICA DI CONTROLLO ---
 
     ris = st.session_state.risultati
     
@@ -522,15 +509,12 @@ with col_right:
         
         st.markdown("<hr style='margin: 0.5rem 0rem;'>", unsafe_allow_html=True)
         
-        # --- CORREZIONE: Layout a 4 colonne (Problema 1, 2 e 3) ---
         col_conf, col_lab, col_pdf, col_xls = st.columns([2.2, 0.8, 0.5, 0.5], vertical_alignment="center") 
         
         with col_conf:
-            # Rimosso il CSS difettoso. Usiamo un markdown semplice.
             st.markdown(f'<span style="font-size: 0.95rem; font-weight: 600; color: {msg_color};">{quad_msg}</span>', unsafe_allow_html=True)
         
         with col_lab:
-            # Rimosso il CSS difettoso.
             st.markdown('<span style="font-weight: 600; text-align: right; display: block; margin-right: 10px;">SCARICA:</span>', unsafe_allow_html=True)
         
         with col_pdf:
@@ -541,11 +525,10 @@ with col_right:
                 file_name="easy_m2_pdf.pdf", 
                 type="secondary", 
                 key="dl_pdf",
-                width="stretch" # CORREZIONE DEPRECATION
+                width="stretch" 
             )
         
         with col_xls:
-            # --- INIZIO BLOCCO MODIFICATO (Excel Auto-fit) ---
             excel_data = io.BytesIO()
             with pd.ExcelWriter(excel_data, engine='xlsxwriter') as writer:
                  df_export_long.to_excel(writer, index=False, sheet_name='Data Entry M2')
@@ -564,7 +547,6 @@ with col_right:
                      worksheet.set_column(i, i, max_len + 2)
                      
             excel_data.seek(0)
-            # --- FINE BLOCCO MODIFICATO ---
             
             st.download_button(
                 label="EXCEL", 
@@ -573,7 +555,5 @@ with col_right:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
                 type="secondary", 
                 key="dl_excel",
-                width="stretch" # CORREZIONE DEPRECATION
+                width="stretch" 
             )
-        
-        # --- FINE BLOCCO MODIFICATO (LAYOUT DESTRA) ---

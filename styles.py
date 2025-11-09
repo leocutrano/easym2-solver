@@ -14,7 +14,6 @@ import os
 
 def apply_custom_css():
     """Inietta il CSS e gli stili personalizzati nella pagina."""
-    # Il tuo codice CSS originale è qui
     custom_css = """
     <style>
     
@@ -156,7 +155,8 @@ def apply_custom_css():
 class PDF(FPDF):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.logo_path = "LOGO_EASYM2_HOR_1.png" # Assumi che il logo sia nella stessa cartella
+        # CORREZIONE: Il file fornito è .jpg
+        self.logo_path = "LOGO_EASYM2_HOR_1.jpg" 
 
     def header(self):
         try:
@@ -192,9 +192,7 @@ class PDF(FPDF):
         header_norm = [str(h).replace('_', '').upper() for h in header]
         colli_peso_cols = [h for h in header if 'Colli' in str(h) or 'Peso' in str(h)]
         
-        # --- INIZIO BLOCCO MODIFICATO ---
         if 'PARTITAA3/MRN' in header_norm and 'MRN-S' in header_norm: # Avanzato completo (6 col)
-        # --- FINE BLOCCO MODIFICATO ---
             widths = [
                 total_width * 0.20, # Voce Doganale (H1)
                 total_width * 0.15, # Contenitore
@@ -203,9 +201,7 @@ class PDF(FPDF):
                 total_width * 0.10, # Colli Allocati
                 total_width * 0.15  # Peso Allocato
             ]
-        # --- INIZIO BLOCCO MODIFICATO ---
         elif 'PARTITAA3/MRN' in header_norm: # Avanzato senza MRN-S (5 col)
-        # --- FINE BLOCCO MODIFICATO ---
              widths = [
                 total_width * 0.25, # Voce Doganale (H1)
                 total_width * 0.20, # Contenitore
@@ -295,9 +291,7 @@ def prepare_data_entry_export(griglia_colli, griglia_peso, partite_df):
     
     # 2. Imposta il nome della colonna "Partita"
     if is_avanzato:
-        # --- INIZIO BLOCCO MODIFICATO ---
         partita_col_name = 'Partita A3/MRN' 
-        # --- FINE BLOCCO MODIFICATO ---
     else:
         partita_col_name = 'Contenitore' # Nel modo Classico, 'nome' è il contenitore
 
@@ -335,10 +329,8 @@ def prepare_data_entry_export(griglia_colli, griglia_peso, partite_df):
         
         df_final = df_merged.sort_values(by=['Voce Doganale (H1)', 'Contenitore', partita_col_name]).reset_index(drop=True)
         
-        # --- INIZIO BLOCCO MODIFICATO ---
         # Ordine colonne finale Avanzato
         col_order = ['Voce Doganale (H1)', 'Contenitore', 'Partita A3/MRN', 'MRN-S', 'Colli Allocati', 'Peso Allocato']
-        # --- FINE BLOCCO MODIFICATO ---
         
         # Rimuovi MRN-S SOLO se la colonna non esiste affatto nel DF finale
         # (non rimuoverla solo perché è vuota)
