@@ -179,7 +179,7 @@ apply_custom_css()
 # --- LOGO IN ALTO A SINISTRA ---
 BASE_DIR = os.path.dirname(__file__)
 # CORREZIONE: Il file fornito è .jpg, non .png
-LOGO_FILENAME = "LOGO_EASYM2_HOR_1.jpg" 
+LOGO_FILENAME = "LOGO_EASYM2.png" 
 LOGO_PATH = os.path.join(BASE_DIR, LOGO_FILENAME)
 mime_type = "image/jpeg" # CORREZIONE: Mime type per jpg
 

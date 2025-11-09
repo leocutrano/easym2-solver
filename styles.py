@@ -156,7 +156,7 @@ class PDF(FPDF):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # CORREZIONE: Il file fornito è .jpg
-        self.logo_path = "LOGO_EASYM2_HOR_1.jpg" 
+        self.logo_path = "LOGO_EASYM2.png" 
 
     def header(self):
         try:
