@@ -1,0 +1,10 @@
+streamlit
+pandas
+numpy
+fpdf2
+pdfplumber
+chardet
+openpyxl
+xlrd
+pyxlsb
+xlsxwriter
