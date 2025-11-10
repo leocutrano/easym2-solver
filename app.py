@@ -345,7 +345,9 @@ with col_left:
             if "Contenitore" in partite_cols:
                 partite_config["Contenitore"] = st.column_config.TextColumn(width=110) # Larghezza fissa in px
             if "MRN-S" in partite_cols:
-                partite_config["MRN-S"] = st.column_config.TextColumn(width=80) # Larghezza fissa in px
+                partite_config["MRN-S"] = st.column_config.NumberColumn(
+                    width=80, format="%d"
+                ) # Larghezza fissa in px
             
             partite_data_edited = st.data_editor(
                 st.session_state.partite_data_source,
